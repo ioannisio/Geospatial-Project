@@ -1,0 +1,376 @@
+---
+title: "Data Preperation"
+author: "Ioannis Ioanndis"
+date: "2023-08-9"
+output: pdf_document
+---
+
+# Data Preperation 
+
+From the `Data` file, our data consist from `3` main files : 
+
+`Sex_harrassment.csv` That contains the points of the attacks in the city
+
+`Education.xlsx`: Contains attributes for the education level in the city 
+
+`Athens_City` folder: geospatial folder contains all important files for the geospatial analysis :
+
+ a.`.pbf`file: geodataframe. It contains attribute data associated with each shape in the shapefile. Each row in this table corresponds to a shape in the shapefile, and each column represents an attribute of the shape.
+
+ b.`.prj`file: This file contains the coordinate system and projection information for the shapefile
+
+ c.`.shp`file: This is the main file containing the geometry data of your spatial objects. It stores the actual shapes (points, lines, polygons) along with their attributes. 
+
+ d.`.shx` file: This is the shape index file. It contains the index of the geometry records in the shapefile.
+
+We are going to modify this data and create a new geospatial folder that would help to proceed in the analysis.
+
+
+```{r}
+library(geojsonio)
+library(jsonlite)
+library(ggplot2)
+library(maps)
+library(sf)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(scales)
+library(tidyr)
+library(foreign)
+library(sfheaders)
+library(openxlsx)
+```
+
+
+```{r}
+Athens_City <- read_sf("Athens_City")
+Education <- read_excel("C:/Users/ioann/OneDrive/Υπολογιστής/Geospatial Project/Data/Athens Education.xlsx")
+Attacks <- read.csv("C:/Users/ioann/OneDrive/Υπολογιστής/Geospatial Project/Data/SexharassmentAthens.csv")
+```
+
+
+
+
+We see that the English names its contained in the geodataframe `Athens_City` in the variable `display_na`.
+Moreover, in the case of the `Education` the names of the regions are contained in the variable `Administrative Regions` in the Greek language. Therefore we need to construct a new column to the two dataframes called `Names_En` "Names in English" that would be the names of the region in English language. This column can be used as `Identifier` for the attributes of the dataframes. 
+```{r}
+Athens_City <- Athens_City %>%
+  mutate(
+    Names_En = str_extract(display_na, "(?<=Municipality of ).*?(?=, Regional)")
+  )
+```
+
+The Column Names contains spaces between the characters ,something that makes it difficult for the edit of the dataframe.
+
+change in a snake case
+
+```{r}
+
+
+
+Education <- Education %>% rename(Administrative_Regions=`Administrative regions`,
+                                  Graduate_High_School=`Graduate High School`,
+                                  Graduate_Middle_School=`Graduate Middle School`,
+                                  Graduate_Primary_School=`Graduate Primary School`,
+                                  Quit_primary_school=`Quit primary School`,
+                                  Not_Ranked=`Not ranked`)
+```
+
+
+The data is collected by the *Hellenic Statistical Authority*, therefore it consist from variables that are writen in greek languange. We are going to create a new column `Names_En`to both `Athens_City` dataframe and `Education` dataframe that it will contain the sort name of municipalities in English and is going to be use as an Indetifier between geodata and dataframes.
+
+
+- `ΔΗΜΟΣ ΑΘΗΝΑΙΩΝ`:Municipality of Athens, Regional Unit of Central Athens
+- `ΔΗΜΟΣ ΒΥΡΩΝΟΣ`:Municipality of Vyronas
+- `ΔΗΜΟΣ ΓΑΛΑΤΣΙΟΥ`:Municipality of Galatsi
+- `ΔΗΜΟΣ ΔΑΦΝΗΣ - ΥΜΗΤΤΟΥ`:Municipality of Dafni- Ymittos
+- `ΔΗΜΟΣ ΖΩΓΡΑΦΟΥ`:Municipality of Zografos
+- `ΔΗΜΟΣ ΗΛΙΟΥΠΟΛΕΩΣ`:Municipality of Ilioupoli
+- `ΔΗΜΟΣ ΚΑΙΣΑΡΙΑΝΗΣ`:Municipality of Kaisariani
+- `ΔΗΜΟΣ ΦΙΛΑΔΕΛΦΕΙΑΣ - ΧΑΛΚΗΔΟΝΟΣ`:Municipality of Nea Philadelfia - Nea Chalkidona
+- `ΔΗΜΟΣ ΑΜΑΡΟΥΣΙΟΥ`:Municipality of Marousi,
+- `ΔΗΜΟΣ ΑΓΙΑΣ ΠΑΡΑΣΚΕΥΗΣ`:Municipality of Agia Paraskevi
+- `ΔΗΜΟΣ ΒΡΙΛΗΣΣΙΩΝ`:Municipality of Vrilissia
+- `ΔΗΜΟΣ ΗΡΑΚΛΕΙΟΥ`:Municipality of Iraklio Attikis
+- `ΔΗΜΟΣ ΚΗΦΙΣΙΑΣ`:Municipality of Kifisia
+- `ΔΗΜΟΣ ΛΥΚΟΒΡΥΣΗΣ - ΠΕΥΚΗΣ`:Municipality of Likovrisi - Pefki
+- `ΔΗΜΟΣ ΜΕΤΑΜΟΡΦΩΣΕΩΣ`:Municipality of Metamorfosi
+- `ΔΗΜΟΣ ΝΕΑΣ ΙΩΝΙΑΣ`:Municipality of Nea Ionia
+- `ΔΗΜΟΣ ΠΑΠΑΓΟΥ - ΧΟΛΑΡΓΟΥ`:Municipality of Papagos - Cholargos
+- `ΔΗΜΟΣ ΠΕΝΤΕΛΗΣ`:Municipality of Penteli
+- `ΔΗΜΟΣ ΦΙΛΟΘΕΗΣ - ΨΥΧΙΚΟΥ`:Municipality of Filothei - Psychiko
+- `ΔΗΜΟΣ ΧΑΛΑΝΔΡΙΟΥ`:Municipality of Chalandri
+- `ΔΗΜΟΣ ΠΕΡΙΣΤΕΡΙΟΥ`:Municipality of Peristeri
+- `ΔΗΜΟΣ ΑΓΙΑΣ ΒΑΡΒΑΡΑΣ`:Municipality of Agia Varvara
+- `ΔΗΜΟΣ ΑΓΙΩΝ ΑΝΑΡΓΥΡΩΝ - ΚΑΜΑΤΕΡΟΥ`:Municipality of Agioi Anargyroi-Kamatero
+- `ΔΗΜΟΣ ΑΙΓΑΛΕΩ`:Municipality of Aigaleo
+- `ΔΗΜΟΣ ΙΛΙΟΥ`:Municipality of Ilion
+- `ΔΗΜΟΣ ΠΕΤΡΟΥΠΟΛΕΩΣ`:Municipality of Petroupoli
+- `ΔΗΜΟΣ ΧΑΪΔΑΡΙΟΥ`:Municipality of Chaidari
+- `ΔΗΜΟΣ ΚΑΛΛΙΘΕΑΣ`:Municipality of Kallithea
+- `ΔΗΜΟΣ ΑΓΙΟΥ ΔΗΜΗΤΡΙΟΥ`:Municipality of Agios Dimitrios
+- `ΔΗΜΟΣ ΑΛΙΜΟΥ`:Municipality of Alimos
+- `ΔΗΜΟΣ ΓΛΥΦΑΔΑΣ`:Municipality of Glyfada
+- `ΔΗΜΟΣ ΕΛΛΗΝΙΚΟΥ - ΑΡΓΥΡΟΥΠΟΛΗΣ`:Municipality of Elliniko - Argyroupoli
+- `ΔΗΜΟΣ ΜΟΣΧΑΤΟΥ - ΤΑΥΡΟΥ `:Municipality of Moschato-Tavros
+- `ΔΗΜΟΣ ΝΕΑΣ ΣΜΥΡΝΗΣ`:Municipality of Nea Smyrni
+- `ΔΗΜΟΣ ΠΑΛΑΙΟΥ ΦΑΛΗΡΟΥ`:Municipality of Palaio Faliro  
+
+Create a new column that gives the English name of the municipality:
+```{r}
+municipality_names <- list("ΔΗΜΟΣ ΑΘΗΝΑΙΩΝ"= "Athens",
+"ΔΗΜΟΣ ΒΥΡΩΝΟΣ" = "Vyronas",
+"ΔΗΜΟΣ ΓΑΛΑΤΣΙΟΥ" = "Galatsi",
+"ΔΗΜΟΣ ΔΑΦΝΗΣ - ΥΜΗΤΤΟΥ"= "Dafni - Ymittos",
+"ΔΗΜΟΣ ΖΩΓΡΑΦΟΥ" =  "Zografos",
+"ΔΗΜΟΣ ΗΛΙΟΥΠΟΛΕΩΣ" =  "Ilioupoli",
+"ΔΗΜΟΣ ΚΑΙΣΑΡΙΑΝΗΣ" =  "Kaisariani",
+"ΔΗΜΟΣ ΦΙΛΑΔΕΛΦΕΙΑΣ - ΧΑΛΚΗΔΟΝΟΣ"=  "Nea Philadelfia - Nea Chalkidona",
+"ΔΗΜΟΣ ΑΜΑΡΟΥΣΙΟΥ"= "Marousi",
+"ΔΗΜΟΣ ΑΓΙΑΣ ΠΑΡΑΣΚΕΥΗΣ"= "Agia Paraskevi",
+"ΔΗΜΟΣ ΒΡΙΛΗΣΣΙΩΝ"= "Vrilissia",
+"ΔΗΜΟΣ ΗΡΑΚΛΕΙΟΥ"= "Iraklio Attikis",
+"ΔΗΜΟΣ ΚΗΦΙΣΙΑΣ"= "Kifisia",
+"ΔΗΜΟΣ ΛΥΚΟΒΡΥΣΗΣ - ΠΕΥΚΗΣ"= "Likovrisi - Pefki",
+"ΔΗΜΟΣ ΜΕΤΑΜΟΡΦΩΣΕΩΣ"= "Metamorfosi",
+"ΔΗΜΟΣ ΝΕΑΣ ΙΩΝΙΑΣ"= "Nea Ionia",
+"ΔΗΜΟΣ ΠΑΠΑΓΟΥ - ΧΟΛΑΡΓΟΥ"= "Papagos - Cholargos",
+"ΔΗΜΟΣ ΠΕΝΤΕΛΗΣ"="Penteli",
+"ΔΗΜΟΣ ΦΙΛΟΘΕΗΣ - ΨΥΧΙΚΟΥ"= "Filothei - Psychiko",
+"ΔΗΜΟΣ ΧΑΛΑΝΔΡΙΟΥ"= "Chalandri",
+"ΔΗΜΟΣ ΠΕΡΙΣΤΕΡΙΟΥ"= "Peristeri",
+"ΔΗΜΟΣ ΑΓΙΑΣ ΒΑΡΒΑΡΑΣ"= "Agia Varvara",
+"ΔΗΜΟΣ ΑΓΙΩΝ ΑΝΑΡΓΥΡΩΝ - ΚΑΜΑΤΕΡΟΥ"= "Agioi Anargyroi-Kamatero",
+"ΔΗΜΟΣ ΑΙΓΑΛΕΩ"= "Aigaleo",
+"ΔΗΜΟΣ ΙΛΙΟΥ"= "Ilion",
+"ΔΗΜΟΣ ΠΕΤΡΟΥΠΟΛΕΩΣ"= "Petroupoli",
+"ΔΗΜΟΣ ΧΑΪΔΑΡΙΟΥ"= "Chaidari",
+"ΔΗΜΟΣ ΚΑΛΛΙΘΕΑΣ"= "Kallithea",
+"ΔΗΜΟΣ ΑΓΙΟΥ ΔΗΜΗΤΡΙΟΥ"="Agios Dimitrios",
+"ΔΗΜΟΣ ΑΛΙΜΟΥ"= "Alimos",
+"ΔΗΜΟΣ ΓΛΥΦΑΔΑΣ"= "Glyfada",
+"ΔΗΜΟΣ ΕΛΛΗΝΙΚΟΥ - ΑΡΓΥΡΟΥΠΟΛΗΣ"= "Elliniko - Argyroupoli",
+"ΔΗΜΟΣ ΜΟΣΧΑΤΟΥ - ΤΑΥΡΟΥ" = "Moschato-Tavros",
+"ΔΗΜΟΣ ΝΕΑΣ ΣΜΥΡΝΗΣ"= "Nea Smyrni",
+"ΔΗΜΟΣ ΠΑΛΑΙΟΥ ΦΑΛΗΡΟΥ"= "Palaio Faliro")
+```
+
+
+
+```{r}
+# corispond the English names to the dataframe
+Education$Names_En <- unlist(unname(municipality_names[match(Education$Administrative_Regions, names(municipality_names))]))
+```
+
+Put the `Names_En` as first column
+```{r}
+Education <- Education %>% select(Names_En,everything())
+```
+
+## Missing values
+
+At first we are going to examine the missing values of the data , meaning the individuals that their education level doesn't appear to the demographic data. In the dataframe **Education**  has the column **Not_Ranked** that indicates the population of those individuals. We are going to examine it as a percentage of the population of each region. 
+
+
+The sum of the population of all the levels plus `Not Ranked`is find it in the variable *Total*
+
+Indeed,
+```{r}
+education_levels <- c("PhDs_Master_Universities","Colleges",
+                         "Graduate_High_School","Graduate_Middle_School",
+                         "Graduate_Primary_School","Quit_primary_school","Not_Ranked")
+```
+
+```{r}
+Education %>% select(education_levels) %>% all(rowSums(.)==Education$Total)
+```
+
+
+Calculate the percentage of the `Not_Ranked` respect to total population
+```{r}
+Education <- Education %>% mutate(Not_Ranked_pct=Not_Ranked/Total)
+```
+
+```{r}
+summary(Education$Not_Ranked_pct)
+ggplot(data=Education, aes(reorder(Names_En, Not_Ranked_pct), y=Education$Not_Ranked_pct)) +
+  geom_bar(stat="identity", color="black", fill="tomato")+
+  coord_flip()+
+  scale_y_continuous(labels = percent_format())+
+  labs(title = "Not Ranked",
+       subtitle = "in % of Total Polulation",
+       x= "Municipality",
+       y="precent")
+boxplot(Education$Not_Ranked_pct,col = "tomato")
+
+```
+
+We ditect that the averange of the missing population of every region is close to  6%  that it is not pass the 8%.
+That means that around 6% of the population missing the data for their education level.
+**Therefore we are going to exclude them from the analysis**
+
+
+>We are going to create a new variable of total population that will **exclude the not ranked population**. 
+From that We are going to compute the percentage of the education levels of each municipality.
+
+```{r}
+Education <- Education %>% mutate(adjust_Total=Total- Not_Ranked)
+
+```
+
+Finally we are going to create percentage for all the educational levels with the new adjust total
+
+```{r}
+# Adjusting  the population/ Exclude the Not Ranked 
+Education <- Education %>% mutate(Uni_Degrees_pct= PhDs_Master_Universities/adjust_Total,
+                                  Colleges_pct= Colleges/adjust_Total,
+                                  High_School_pct= Graduate_High_School/adjust_Total,
+                                  Middle_School_pct=Graduate_Middle_School/adjust_Total,
+                                  Primary_School_pct=Graduate_Primary_School/adjust_Total,
+                                  Quit_pct=Quit_primary_school/adjust_Total)
+```
+We consider also an cut-off point of the education level. That would be te *Population that has finished secondary education*. That means all people that have graduate at least from the high school. This includes people that graduates from : `High School`, `College`, `University`
+
+```{r}
+Education <-  Education %>%  mutate(Finish_Secondary_pct = 
+                                      (PhDs_Master_Universities+Colleges+Graduate_High_School)/adjust_Total )
+```
+
+
+
+
+## Population
+
+ whole population is 
+```{r}
+totalPopulation <- sum(Education$Total)
+totalPopulation
+```
+Calculate the percent of the population of regions respect to the total population of the city.
+```{r}
+Education <- Education %>% mutate(Total_pct = Total/totalPopulation)
+```
+
+
+
+
+- Create Serial Number
+
+Create a serial number column for every region 
+
+```{r}
+Education$SerialNumber <- seq_len(nrow(Education))
+```
+```{r}
+serial <- Education %>% select(SerialNumber,Names_En)
+```
+
+```{r}
+Athens_City <- left_join(Athens_City,serial, by = "Names_En")
+```
+
+Trasport the `Finish_Secondary_pct` column also to the geodataframe `Athens_City`
+
+```{r}
+df <-  Education %>% select(Names_En,Finish_Secondary_pct)
+Athens_City <- left_join(Athens_City,df, by = "Names_En")
+```
+
+
+
+See if the column `Names_En` and `SerialNumber`of both dataframes `Athens_City` and `Education` are indentical
+```{r}
+print(identical(sort(Athens_City$Names_En), sort(Education$Names_En)))
+print(identical(sort(Athens_City$SerialNumber), sort(Education$SerialNumber)))
+```
+
+## Attack Points
+
+We modify the `Attack_Points` with the correct coordinates system
+```{r}
+
+Attack_Points <- st_as_sf(Attacks, coords = c("X", "Y"), crs = 4326)
+```
+
+Those are points from all over the country. We need only the points that are in the city of Athens. We are going to find them with intersection.
+
+ Find points that intersect with the geospatial multipolygon
+```{r}
+
+Attack_Points <- st_intersection(Attack_Points, Athens_City)
+```
+
+```{r}
+df <- Athens_City %>% select(SerialNumber,Names_En,display_na,geometry)
+```
+
+```{r}
+Attack_Points1 <- st_join(Attack_Points, df, join = st_within)
+```
+
+Now , the dataframe`Attack_Points1` contains all the points of that an attack was occured. What we interest is the amount of the attacks on each region. Therefore, we are going to extract the names , and create a column in `Education` that contains the number of attacks to each region.
+```{r}
+vector_incident <- Attack_Points1$Names_En.x
+```
+
+
+
+```{r}
+count <- table(vector_incident)
+Count_Points <- data.frame(Names_En = names(count),count_points = as.numeric(count))
+```
+
+```{r}
+dim(Count_Points)
+```
+We see that one region missing (no attacks in that region). We are going to insert to this region the number 0 (zero attacks)
+```{r}
+Education <- left_join(Education,Count_Points,by = "Names_En")
+
+```
+
+Put in the front the columns 
+```{r}
+Education <- Education %>% select(SerialNumber,Names_En,count_points,everything())
+```
+
+```{r}
+Education <- Education %>%   mutate(count_points = ifelse(is.na(count_points), 0, count_points))
+```
+Pass the `count_points` also to the geodataframe `Athens_City`
+
+```{r}
+pointsc <-  Education %>% select(Names_En,count_points)
+
+Athens_City <- left_join(Athens_City,pointsc,by = "Names_En")
+```
+
+
+Reorder the dataframes
+```{r}
+
+
+# Reorder columns so SerialNumber comes first
+Education <- Education %>%select(SerialNumber,Names_En,count_points,Finish_Secondary_pct,everything())
+Athens_City <- Athens_City %>%select(SerialNumber,Names_En,count_points,Finish_Secondary_pct,everything())
+
+
+```
+## Save the new files 
+
+```{r }
+path <- "C:/Users/ioann/OneDrive/Υπολογιστής/Geospatial Project/"
+write.xlsx(Education, file = paste0(path,"Education_Prepared.xlsx"))
+
+
+```
+
+```{r}
+write_sf(Attack_Points1,paste0(path,"Attack_Points.geojson"))
+```
+
+```{r}
+write_sf(Athens_City,paste0(path,"Athens_City_Prepared.geojson"))
+```
+

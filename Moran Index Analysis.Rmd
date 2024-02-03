@@ -1,0 +1,323 @@
+---
+title: "Moran Index Analysis"
+author: "Ioannis Ioanndis"
+date: "2023-05-04"
+output: html_document
+---
+
+# Moran Index Analysis
+
+## Moran's Index Definition
+ 
+The Moran's I Index is a statistical measure used in geographical analysis and statistics to evaluate spatial autocorrelation, which is the degree to which the values of a variable are associated with the values of the same variable in nearby geographic regions or spatial units. It assists researchers and analysts in determining if a pattern of similarity or dissimilarity exists in the distribution of a specific property across a geographic area.
+It is employed to:
+Identifies geographical patterns in data to determine if clustering or dispersion is required.
+Specify whether comparable values are grouped together or spread randomly.
+If there is evidence of spatial dependency, which means that local places are more likely to be similar than distant locations.
+
+```{r}
+library(spdep) 
+library(sf)
+library(tmap) 
+library(leaflet)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(spatialreg)
+```
+## Load the data 
+```{r }
+Athens_City <- st_read("Geodata")
+```
+```{r}
+Attack <- st_read("Attack_Points.geojson")
+```
+
+```{r}
+Education <- read_excel("Education_Prepared.xlsx")
+```
+
+
+```{r}
+names(Athens_City)
+```
+
+We are going to rename the `Finish_Secondary_pct` to shorter `edu`
+```{r}
+Athens_City <- Athens_City %>% rename(SerialNumber = SerialNumb,count_points =count_poin,edu =Finish_Sec)
+```
+
+
+## Define spatial Neighbours 
+
+First we must clarify which spatial units can be consider as neighbours. Most common approach, is to difine by distance of two spatia-units or from a common boundary. There are multiple ways for that definition,such as k-nearest neighbours , critical cut-off distance , contiguity -based. It also be needed to be defined a representative point for each spatial - unit. A main choise is the centroid of the region.
+
+```{r}
+coords <- st_centroid(st_geometry(Athens_City))
+```
+
+# Global Moran Index Analysis 
+
+In global autocorrelation analysis we examine autocorrelation in the entire dataset (all regions). Therefore we choose to pick neighbours with *critical cut-off distance* method.
+
+First we must find the the minimum threshold distance which allows all regions to have at least one neighbour.
+
+We are going to calculate the k-NN with k= 1 (giving one neighbour to each region) and using as threshold the maximum of it. (Therefore everyone will have at least on neighbour).
+```{r}
+knn1ATH <- knn2nb(knearneigh(coords,k=1))
+all.linkedT <- max(unlist(nbdists(knn1ATH, coords))) 
+all.linkedT
+```
+
+We found that the maximum k-NN is `5.152077`. We are going to use `5.16`
+
+
+
+## Define spatial weights
+
+```{r}
+dnb516 <- dnearneigh(coords, 0, 5.16)
+
+dnb516.listw <- nb2listw(dnb516,style="W")
+```
+
+##Plotting
+
+```{r}
+plot(st_geometry(Athens_City), border="grey") 
+title(main="d nearest neighbours, d = 5.16 km") 
+plot(dnb516, coords, add=TRUE, col="blue")
+```
+## Moran Index test of spatial autocorrelation (global)
+
+We perfom Moran Index I for spatial autocorrelation for the two variables `count_points` that are the amount of sexual harrassment attacks in each region and for `Finish_Secondary_pct` that counts the percentage of the people of the region finished at least secondary education.
+
+Under the normality assumption 
+```{r}
+moran.test(Athens_City$count_poin, dnb516.listw, randomisation=FALSE)
+```
+```{r}
+moran.test(Athens_City$edu, dnb516.listw, randomisation=FALSE)
+```
+
+The results gives for :
+
+sexual harassment attacks: p-value = 40.02%  We cannot declare any correlation between the regions regarding the attacks
+education level (graduate secodary education) : p-value << 5% that the education level is indeed related by the region.
+
+- with randomisation
+
+```{r}
+moran.test(Athens_City$count_points, dnb516.listw, randomisation=TRUE)
+```
+```{r}
+moran.test(Athens_City$edu, dnb516.listw, randomisation=TRUE)
+```
+In randomisation we see that we come in the same conclusion.
+
+
+# Descriptive spatial statistics for areal data (local analysis)
+
+Moran Index I test can global can captures a global pattern of the autocorrelation , in the whole dataset but we may interest to find clusters of regions inside the dataset. 
+
+
+
+
+## Moran scatterplot
+
+We are going to use moran scatterplot in order to indentify the regions that influence the most the local area. In Moran scatterplot the areas with the most influence are marked 
+```{r}
+mplot_edu <- moran.plot(Athens_City$edu, listw=dnb516.listw,
+                        main="Moran scatterplot",
+                        xlab = "Finish Secondary Education",
+                        ylab = "Lagged")
+grid()
+```
+We can see 3 areas in the education level that influence the most.
+
+```{r}
+mplot_att <- moran.plot(Athens_City$count_points, listw=dnb516.listw, 
+                        main="Moran scatterplot",
+                        xlab = "Attacks",
+                        ylab = "Lagged")
+grid()
+```
+2 areas to the attack points. Let plot on map to visualise the areas 
+```{r}
+Athens_City$hat_value_edu <- mplot_edu$hat
+tm_shape(Athens_City) + tm_polygons("hat_value_edu") +tm_layout(title = "Education")
+ 
+```
+
+```{r}
+Athens_City$hat_value_att <- mplot_att$hat
+tm_shape(Athens_City) + tm_polygons("hat_value_att")+tm_layout(title = "Attacks")
+
+```
+
+
+```{r}
+mplot_edu <- moran.plot(Athens_City$edu, listw=dnb516.listw, main="Moran scatterplot", 
+         return_df=F)
+mplot_att <- moran.plot(Athens_City$count_points, listw=dnb516.listw, main="Moran scatterplot", 
+         return_df=F)
+hotspot_edu <- as.numeric(row.names(as.data.frame(summary(mplot_edu))))
+
+hotspot_att <- as.numeric(row.names(as.data.frame(summary(mplot_att))))
+
+```
+
+```{r}
+Athens_City$wx_edu <- lag.listw(dnb516.listw, Athens_City$edu)
+Athens_City$wx_att <- lag.listw(dnb516.listw, Athens_City$count_points)
+```
+
+
+
+
+```{r}
+Athens_City$quadrant_edu <- rep("None", length(Athens_City$edu))
+for(i in 1:length(hotspot_edu))  {
+  if (Athens_City$edu[hotspot_edu[i]]>mean(Athens_City$edu) & Athens_City$wx_edu[hotspot_edu[i]]> mean(Athens_City$wx_edu)) 
+        Athens_City$quadrant_edu[hotspot_edu[i]] <- "HH" 
+  if (Athens_City$edu[hotspot_edu[i]]>mean(Athens_City$edu) & Athens_City$wx_edu[hotspot_edu[i]]< mean(Athens_City$wx_edu)) 
+        Athens_City$quadrant_edu[hotspot_edu[i]] <- "HL" 
+  if (Athens_City$edu[hotspot_edu[i]]<mean(Athens_City$edu) & Athens_City$wx_edu[hotspot_edu[i]]<mean(Athens_City$wx_edu)) 
+        Athens_City$quadrant_edu[hotspot_edu[i]] <- "LL" 
+  if (Athens_City$edu[hotspot_edu[i]]<mean(Athens_City$edu) & Athens_City$wx_edu[hotspot_edu[i]]>mean(Athens_City$wx_edu)) 
+        Athens_City$quadrant_edu[hotspot_edu[i]] <- "LH" 
+  }
+table(Athens_City$quadrant_edu)
+
+```
+
+
+```{r}
+Athens_City$quadrant_att <- rep("None", length(Athens_City$count_points))
+for(i in 1:length(hotspot_att))  {
+  if (Athens_City$count_points[hotspot_att[i]]>mean(Athens_City$count_points) & Athens_City$wx_att[hotspot_att[i]]> mean(Athens_City$wx_att)) 
+        Athens_City$quadrant_att[hotspot_att[i]] <- "HH" 
+  if (Athens_City$count_points[hotspot_att[i]]>mean(Athens_City$count_points) & Athens_City$wx_att[hotspot_att[i]]< mean(Athens_City$wx_att)) 
+        Athens_City$quadrant_att[hotspot_att[i]] <- "HL" 
+  if (Athens_City$count_points[hotspot_att[i]]<mean(Athens_City$count_points) & Athens_City$wx_att[hotspot_att[i]]<mean(Athens_City$wx_att)) 
+        Athens_City$quadrant_att[hotspot_att[i]] <- "LL" 
+  if (Athens_City$count_points[hotspot_att[i]]<mean(Athens_City$count_points) & Athens_City$wx_att[hotspot_att[i]]>mean(Athens_City$wx_att)) 
+        Athens_City$quadrant_att[hotspot_att[i]] <- "LH" 
+  }
+table(Athens_City$quadrant_att)
+
+```
+```{r}
+tm_shape(Athens_City) + tm_polygons("quadrant_edu") + tm_layout(title = "Education")
+```
+```{r}
+tm_shape(Athens_City) + tm_polygons("quadrant_att") + tm_layout(title = "Attacks")
+```
+The results give :
+For the Education Level:
+ That have "High-High" and "Low -Low"   in moran scatterplot meaning that we have positive autocorrelation
+ On the other hand  in Attacks we have two regions, one "High-Low" and one "Low - High" considering as negative autocorrelation.
+ 
+# Local Moran Index Analysis
+
+We are going to see the significance of the visual results 
+
+```{r}
+lmI_edu <- localmoran(Athens_City$edu, dnb516.listw)
+head(lmI_edu)
+```
+
+
+```{r}
+lmI_att <- localmoran(Athens_City$count_points, dnb516.listw)
+head(lmI_att)
+```
+
+
+```{r}
+Athens_City$lmI_edu <- lmI_edu[,1]
+
+tm_shape(Athens_City) + 
+  tm_polygons("lmI_edu") +
+  tm_layout(title = "Local Moran's I values (Education)",title.size = 1.1)
+
+
+```
+It can be noticed, that regions in the far West part and Far East part of the city have high Moran 's I values for the variable of the education. That can be noticed also from the global analysis and the plotting in `Data Exploration` that the region in the west have low values in the education compare to the averange , where in the east higher than the averange.
+
+```{r}
+Athens_City$lmI_att <- lmI_att[,1]
+
+tm_shape(Athens_City) + 
+  tm_polygons("lmI_att") +
+  tm_layout(title = "Local Moran's I values (Attacks)",title.size = 1.1)
+
+
+```
+In the terms of the Local Moran Index value in the variable of the attacks, Athens City center monopolize the the values , an expected results since most of the attacks occured there. 
+
+Its important to see how much significant are those results 
+
+
+```{r}
+Athens_City$locmpv_edu <- p.adjust(lmI_edu[, "Pr(z != E(Ii))"], "bonferroni")
+tm_shape(Athens_City) + 
+    tm_polygons("locmpv_edu", title = "Local Moran's I significance map",
+                breaks=c(0, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.2, 0.5, 0.75, 1)) + tm_layout(title = "Education")
+```
+From the results in the variable of the Education, it can be noticed , that only two regions `Peristeri` in the West and `Agia Paraskevi` in the East can be consider significant to influence:
+```{r}
+a <- Athens_City$locmpv_edu[which(Athens_City$Names_En =="Peristeri")]
+b <- Athens_City$locmpv_edu[which(Athens_City$Names_En =="Agia Paraskevi")]
+
+print(paste("Agia Paraskevi",a))
+print(paste("Peristeri",b))
+```
+As a coclusion, even from the global analysis that was already shown  signinifant difference in the matter of  education between west and east .
+```{r}
+result_df <- tibble(Result = sig)
+print(result_df)
+```
+
+
+
+```{r}
+Athens_City$locmpv_att <- p.adjust(lmI_att[, "Pr(z != E(Ii))"], "bonferroni")
+tm_shape(Athens_City) + 
+    tm_polygons("locmpv_att", title = "Local Moran's I significance map",
+                breaks=c(0, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.2, 0.5, 0.75, 1)) +tm_layout(title = "Attacks")
+```
+
+For the variable of the attacks we see that the Moran Index is not significant. Therefore we cannot assume any local influence of regions in the matter of the attacks.
+
+
+# Spatial Regression
+
+The purpose of conduct this analysis was also to estimate any influence of the education that can be occured to the number of the attacks on a region. Therefore we are going to conduct a spatial regression model.
+
+
+```{r}
+SDM <- lagsarlm(Athens_City$count_points~ edu, data = Athens_City, listw=dnb516.listw,
+                type="mixed")
+summary(SDM)
+```
+
+As been expected it cannot be proved any spatial autocorrelation of the Education and Attacks.
+
+More precisely, 
+The p-value for the spatial autoregressive parameter Rho is not significant p-value = 0.948
+
+where also the Lagrange Multiplier test for the  spatial autocorrelation in the lag model resduals gives p-value = 0.122 not significant.
+Therefore we have no evidence to prove spatial autocorrelation for the two variables *Education* and *Attacks*.
+
+
+We are going to see the robustness of the model performing analysis of the impact of the variable education , conducting 100 simulation of Monte Carlo.
+```{r}
+impSDM <- impacts(SDM, listw=dnb516.listw, R=100)
+summary(impSDM, zstats=TRUE, short=TRUE)
+```
+
+By the results we see that the impact of Education is not significant. The p-values are large to reject the null hypothesis.
+
+To conclude, there is not any evidence of any significant impact of the Education to the attacks.
+

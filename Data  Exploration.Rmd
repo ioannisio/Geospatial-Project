@@ -1,0 +1,848 @@
+---
+title: "Data Preparation"
+author: "Ioannis Ioanndis"
+date: "2023-09-01"
+output: pdf_document
+---
+
+
+# Geospatial Analysis 
+
+This analysis is been conducted  in context of Geospatial Analysis for Data Science course of M.Sc Data Science , University of Trento.
+The purpose of  this project is an analysis of the criminality of city of Athens in related with the education level of the administrative regions of the city.
+All the sources derive from the *Hellenic Statistical Authority* and the *Ministry of the Interior and Administrative Reconstruction*
+
+Links
+https://www.statistics.gr/en/home 
+http://geodata.gov.gr/en/dataset/anoikhta-demosia-dedomena-egklematikotetas
+
+
+
+
+The main database that we are going to contain are:
+
+### For the criminality:
+
+- **Sexual harassment**: geodataframe that contains geographical points that a sexual harassment attack had been occured  for every year starting from 2014 until 2022 from all the country of Greece. The data in 2014 contains data from the year 2014 and the previous 5 years.
+
+
+
+### For education level:
+
+-The Education Level data: Contains statistics for the population of every municipality of Athens.The data discribes the level of education of the adault population in each municipality. 
+
+The list is the libraries of R studio that they will been used for the analysis
+```{r}
+library(geojsonio)
+library(jsonlite)
+library(ggplot2)
+library(maps)
+library(sf)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(scales)
+library(tidyr)
+library(foreign)
+library(sfheaders)
+```
+
+
+# Geospatial Data Folder 
+
+We are going to use the `geojson`  file that we produce in the python file `Athens Criminality` in order to extract shp, prj,dbf,shx files. 
+
+It been used in Linux the following command:
+
+> ogr2ogr -f "ESRI Shapefile" "/home/ioannisio/Athens_City/Athens_City.shp" "/home/ioannisio/Project Geospatial/Athens_City.geojson"
+
+## Create an Identifiers
+
+Load the database to create Identifier between geodata and the CSV files.
+```{r}
+Athens_City <- st_read("Athens_City")
+
+```
+
+```{r}
+Athens_City %>%  head(4)
+```
+
+We will create a column in the `Athens_City` to match it later with other dataframes. More precisely , the English names of the regions
+
+- Create Names_En 
+```{r}
+Athens_City <- Athens_City %>%
+  mutate(
+    Names_En = str_extract(display_na, "(?<=Municipality of ).*?(?=, Regional)")
+  )
+```
+
+```{r}
+names(Athens_City)
+```
+
+Loading the Education Data
+```{r}
+Education <- read_excel("C:/Users/ioann/OneDrive/Υπολογιστής/Geospatial Project/Data/Athens Education.xlsx")
+```
+
+```{r}
+Education %>% head(5)
+
+```
+
+The Column Names contains spaces between the characters ,something that makes it difficult for the edit of the dataframe.
+
+change in a snake case
+
+```{r}
+
+
+
+Education <- Education %>% rename(Administrative_Regions=`Administrative regions`,
+                                  Graduate_High_School=`Graduate High School`,
+                                  Graduate_Middle_School=`Graduate Middle School`,
+                                  Graduate_Primary_School=`Graduate Primary School`,
+                                  Quit_primary_school=`Quit primary School`,
+                                  Not_Ranked=`Not ranked`)
+```
+
+
+The data is collected by the *Hellenic Statistical Authority*, therefore it consist from variables that are writen in greek languange. We are going to create a new column `Names_En`to both `Athens_City` dataframe and `Education` dataframe that it will contain the sort name of municipalities in English and is going to be use as an Indetifier between geodata and dataframes.
+
+
+- `ΔΗΜΟΣ ΑΘΗΝΑΙΩΝ`:Municipality of Athens, Regional Unit of Central Athens
+- `ΔΗΜΟΣ ΒΥΡΩΝΟΣ`:Municipality of Vyronas
+- `ΔΗΜΟΣ ΓΑΛΑΤΣΙΟΥ`:Municipality of Galatsi
+- `ΔΗΜΟΣ ΔΑΦΝΗΣ - ΥΜΗΤΤΟΥ`:Municipality of Dafni- Ymittos
+- `ΔΗΜΟΣ ΖΩΓΡΑΦΟΥ`:Municipality of Zografos
+- `ΔΗΜΟΣ ΗΛΙΟΥΠΟΛΕΩΣ`:Municipality of Ilioupoli
+- `ΔΗΜΟΣ ΚΑΙΣΑΡΙΑΝΗΣ`:Municipality of Kaisariani
+- `ΔΗΜΟΣ ΦΙΛΑΔΕΛΦΕΙΑΣ - ΧΑΛΚΗΔΟΝΟΣ`:Municipality of Nea Philadelfia - Nea Chalkidona
+- `ΔΗΜΟΣ ΑΜΑΡΟΥΣΙΟΥ`:Municipality of Marousi,
+- `ΔΗΜΟΣ ΑΓΙΑΣ ΠΑΡΑΣΚΕΥΗΣ`:Municipality of Agia Paraskevi
+- `ΔΗΜΟΣ ΒΡΙΛΗΣΣΙΩΝ`:Municipality of Vrilissia
+- `ΔΗΜΟΣ ΗΡΑΚΛΕΙΟΥ`:Municipality of Iraklio Attikis
+- `ΔΗΜΟΣ ΚΗΦΙΣΙΑΣ`:Municipality of Kifisia
+- `ΔΗΜΟΣ ΛΥΚΟΒΡΥΣΗΣ - ΠΕΥΚΗΣ`:Municipality of Likovrisi - Pefki
+- `ΔΗΜΟΣ ΜΕΤΑΜΟΡΦΩΣΕΩΣ`:Municipality of Metamorfosi
+- `ΔΗΜΟΣ ΝΕΑΣ ΙΩΝΙΑΣ`:Municipality of Nea Ionia
+- `ΔΗΜΟΣ ΠΑΠΑΓΟΥ - ΧΟΛΑΡΓΟΥ`:Municipality of Papagos - Cholargos
+- `ΔΗΜΟΣ ΠΕΝΤΕΛΗΣ`:Municipality of Penteli
+- `ΔΗΜΟΣ ΦΙΛΟΘΕΗΣ - ΨΥΧΙΚΟΥ`:Municipality of Filothei - Psychiko
+- `ΔΗΜΟΣ ΧΑΛΑΝΔΡΙΟΥ`:Municipality of Chalandri
+- `ΔΗΜΟΣ ΠΕΡΙΣΤΕΡΙΟΥ`:Municipality of Peristeri
+- `ΔΗΜΟΣ ΑΓΙΑΣ ΒΑΡΒΑΡΑΣ`:Municipality of Agia Varvara
+- `ΔΗΜΟΣ ΑΓΙΩΝ ΑΝΑΡΓΥΡΩΝ - ΚΑΜΑΤΕΡΟΥ`:Municipality of Agioi Anargyroi-Kamatero
+- `ΔΗΜΟΣ ΑΙΓΑΛΕΩ`:Municipality of Aigaleo
+- `ΔΗΜΟΣ ΙΛΙΟΥ`:Municipality of Ilion
+- `ΔΗΜΟΣ ΠΕΤΡΟΥΠΟΛΕΩΣ`:Municipality of Petroupoli
+- `ΔΗΜΟΣ ΧΑΪΔΑΡΙΟΥ`:Municipality of Chaidari
+- `ΔΗΜΟΣ ΚΑΛΛΙΘΕΑΣ`:Municipality of Kallithea
+- `ΔΗΜΟΣ ΑΓΙΟΥ ΔΗΜΗΤΡΙΟΥ`:Municipality of Agios Dimitrios
+- `ΔΗΜΟΣ ΑΛΙΜΟΥ`:Municipality of Alimos
+- `ΔΗΜΟΣ ΓΛΥΦΑΔΑΣ`:Municipality of Glyfada
+- `ΔΗΜΟΣ ΕΛΛΗΝΙΚΟΥ - ΑΡΓΥΡΟΥΠΟΛΗΣ`:Municipality of Elliniko - Argyroupoli
+- `ΔΗΜΟΣ ΜΟΣΧΑΤΟΥ - ΤΑΥΡΟΥ `:Municipality of Moschato-Tavros
+- `ΔΗΜΟΣ ΝΕΑΣ ΣΜΥΡΝΗΣ`:Municipality of Nea Smyrni
+- `ΔΗΜΟΣ ΠΑΛΑΙΟΥ ΦΑΛΗΡΟΥ`:Municipality of Palaio Faliro  
+
+Create a new column that gives the English name of the municipality:
+```{r}
+municipality_names <- list("ΔΗΜΟΣ ΑΘΗΝΑΙΩΝ"= "Athens",
+"ΔΗΜΟΣ ΒΥΡΩΝΟΣ" = "Vyronas",
+"ΔΗΜΟΣ ΓΑΛΑΤΣΙΟΥ" = "Galatsi",
+"ΔΗΜΟΣ ΔΑΦΝΗΣ - ΥΜΗΤΤΟΥ"= "Dafni - Ymittos",
+"ΔΗΜΟΣ ΖΩΓΡΑΦΟΥ" =  "Zografos",
+"ΔΗΜΟΣ ΗΛΙΟΥΠΟΛΕΩΣ" =  "Ilioupoli",
+"ΔΗΜΟΣ ΚΑΙΣΑΡΙΑΝΗΣ" =  "Kaisariani",
+"ΔΗΜΟΣ ΦΙΛΑΔΕΛΦΕΙΑΣ - ΧΑΛΚΗΔΟΝΟΣ"=  "Nea Philadelfia - Nea Chalkidona",
+"ΔΗΜΟΣ ΑΜΑΡΟΥΣΙΟΥ"= "Marousi",
+"ΔΗΜΟΣ ΑΓΙΑΣ ΠΑΡΑΣΚΕΥΗΣ"= "Agia Paraskevi",
+"ΔΗΜΟΣ ΒΡΙΛΗΣΣΙΩΝ"= "Vrilissia",
+"ΔΗΜΟΣ ΗΡΑΚΛΕΙΟΥ"= "Iraklio Attikis",
+"ΔΗΜΟΣ ΚΗΦΙΣΙΑΣ"= "Kifisia",
+"ΔΗΜΟΣ ΛΥΚΟΒΡΥΣΗΣ - ΠΕΥΚΗΣ"= "Likovrisi - Pefki",
+"ΔΗΜΟΣ ΜΕΤΑΜΟΡΦΩΣΕΩΣ"= "Metamorfosi",
+"ΔΗΜΟΣ ΝΕΑΣ ΙΩΝΙΑΣ"= "Nea Ionia",
+"ΔΗΜΟΣ ΠΑΠΑΓΟΥ - ΧΟΛΑΡΓΟΥ"= "Papagos - Cholargos",
+"ΔΗΜΟΣ ΠΕΝΤΕΛΗΣ"="Penteli",
+"ΔΗΜΟΣ ΦΙΛΟΘΕΗΣ - ΨΥΧΙΚΟΥ"= "Filothei - Psychiko",
+"ΔΗΜΟΣ ΧΑΛΑΝΔΡΙΟΥ"= "Chalandri",
+"ΔΗΜΟΣ ΠΕΡΙΣΤΕΡΙΟΥ"= "Peristeri",
+"ΔΗΜΟΣ ΑΓΙΑΣ ΒΑΡΒΑΡΑΣ"= "Agia Varvara",
+"ΔΗΜΟΣ ΑΓΙΩΝ ΑΝΑΡΓΥΡΩΝ - ΚΑΜΑΤΕΡΟΥ"= "Agioi Anargyroi-Kamatero",
+"ΔΗΜΟΣ ΑΙΓΑΛΕΩ"= "Aigaleo",
+"ΔΗΜΟΣ ΙΛΙΟΥ"= "Ilion",
+"ΔΗΜΟΣ ΠΕΤΡΟΥΠΟΛΕΩΣ"= "Petroupoli",
+"ΔΗΜΟΣ ΧΑΪΔΑΡΙΟΥ"= "Chaidari",
+"ΔΗΜΟΣ ΚΑΛΛΙΘΕΑΣ"= "Kallithea",
+"ΔΗΜΟΣ ΑΓΙΟΥ ΔΗΜΗΤΡΙΟΥ"="Agios Dimitrios",
+"ΔΗΜΟΣ ΑΛΙΜΟΥ"= "Alimos",
+"ΔΗΜΟΣ ΓΛΥΦΑΔΑΣ"= "Glyfada",
+"ΔΗΜΟΣ ΕΛΛΗΝΙΚΟΥ - ΑΡΓΥΡΟΥΠΟΛΗΣ"= "Elliniko - Argyroupoli",
+"ΔΗΜΟΣ ΜΟΣΧΑΤΟΥ - ΤΑΥΡΟΥ" = "Moschato-Tavros",
+"ΔΗΜΟΣ ΝΕΑΣ ΣΜΥΡΝΗΣ"= "Nea Smyrni",
+"ΔΗΜΟΣ ΠΑΛΑΙΟΥ ΦΑΛΗΡΟΥ"= "Palaio Faliro")
+```
+
+
+
+```{r}
+# corispond the English names to the dataframe
+Education$Names_En <- unlist(unname(municipality_names[match(Education$Administrative_Regions, names(municipality_names))]))
+```
+
+See if the column `Name_En` of both dataframes `Athens_City` and `Education` are indentical
+```{r}
+identical(sort(Athens_City$Names_En), sort(Education$Names_En))
+```
+
+- Create Serial Number
+
+Create a serial number column for every region 
+```{r}
+Athens_City$SerialNumber <- seq_len(nrow(Athens_City))
+
+# Reorder columns so SerialNumber comes first
+Athens_City <- Athens_City[, c("SerialNumber", "Names_En", setdiff(names(Athens_City), c("SerialNumber", "Names_En")))]
+
+
+```
+We create a `Serial Number` also to `Education` dataframe
+```{r}
+Education <- left_join(Education, Athens_City %>% select(Names_En, SerialNumber), by = "Names_En")
+
+Education <- Education[, c("SerialNumber", "Names_En", setdiff(names(Education), c("SerialNumber", "Names_En")))]
+```
+
+## Guiding map 
+
+
+Create guide map/table for the regions in order the readers of this analysis to refer to them if it is necessary for the coprehension.
+```{r}
+ggplot(Athens_City) + 
+  geom_sf() +
+  geom_sf_text(aes(label = SerialNumber),check_overlap =TRUE ,size = 2, nudge_y = 0)
+
+table_region <-  Athens_City %>% select(SerialNumber,Names_En) 
+knitr::kable(table_region)
+
+
+```
+```{r}
+print(paste(Education$SerialNumber, Education$Names_En, sep = ", "))
+```
+
+
+
+
+# Education
+
+*Education Level Athens* contains data for the Education level of the municipalities of the city 
+
+```{r}
+names(Education)
+
+```
+
+### Variables descriptions
+
+
+The Data contains 10 variables 
+- `code`: The code of each region 
+- `Administrative regions`: The name of each municipality of  Athens 
+- `Total`: the total population of each municipality
+- `PhDs_Master_Universities`: population that graduate with University degree.(Bachelor, Master or PhD degree) 
+- `Colleges`:population that graduate from college
+- `Graduate High School`: population that graduate from high school
+- `Graduate Middle School`: population that graduate from middle school
+- `Graduate Primary School`: population that graduate from primary school
+- `Quit primary School`: population that quit from primary school
+- `Not ranked`: population that missing information in order to classified in the previous classes
+
+The sum of the population of all the levels is find it in the variable *Total*
+
+
+
+
+
+
+## Missing values
+
+At first we are going to examine the missing values of the data , meaning the individuals that their education level doesn't appear to the demographic data. In the dataframe **Education**  has the column **Not_Ranked** that indicates the population of those individuals. We are going to examine it as a percentage of the population of each region. 
+
+
+The sum of the population of all the levels plus `Not Ranked`is find it in the variable *Total*
+
+Indeed,
+```{r}
+education_levels <- c("PhDs_Master_Universities","Colleges",
+                         "Graduate_High_School","Graduate_Middle_School",
+                         "Graduate_Primary_School","Quit_primary_school","Not_Ranked")
+```
+
+```{r}
+Education %>% select(education_levels) %>% all(rowSums(.)==Education$Total)
+```
+
+
+Calculate the percentage of the `Not_Ranked` respect to total population
+```{r}
+Education <- Education %>% mutate(Not_Ranked_pct=Not_Ranked/Total)
+```
+
+```{r}
+summary(Education$Not_Ranked_pct)
+ggplot(data=Education, aes(reorder(Names_En, Not_Ranked_pct), y=Education$Not_Ranked_pct)) +
+  geom_bar(stat="identity", color="black", fill="tomato")+
+  coord_flip()+
+  scale_y_continuous(labels = percent_format())+
+  labs(title = "Not Ranked",
+       subtitle = "in % of Total Polulation",
+       x= "Municipality",
+       y="precent")
+boxplot(Education$Not_Ranked_pct,col = "tomato")
+
+```
+
+We ditect that the averange of the missing population of every region is close to  6%  that it is not pass the 8%.
+That means that around 6% of the population missing the data for their education level.
+**Therefore we are going to exclude them from the analysis**
+
+
+>We are going to create a new variable of total population that will **exclude the not ranked population**. 
+From that We are going to compute the percentage of the education levels of each municipality.
+
+```{r}
+Education <- Education %>% mutate(adjust_Total=Total- Not_Ranked)
+
+```
+
+Finally we are going to create percentage for all the educational levels with the new adjust total
+
+```{r}
+# Adjusting  the population/ Exclude the Not Ranked 
+Education <- Education %>% mutate(Uni_Degrees_pct= PhDs_Master_Universities/adjust_Total,
+                                  Colleges_pct= Colleges/adjust_Total,
+                                  High_School_pct= Graduate_High_School/adjust_Total,
+                                  Middle_School_pct=Graduate_Middle_School/adjust_Total,
+                                  Primary_School_pct=Graduate_Primary_School/adjust_Total,
+                                  Quit_pct=Quit_primary_school/adjust_Total)
+```
+
+## Population 
+
+Let have a view of the descriptive statistics
+
+
+```{r}
+summary(Education)
+```
+We see that from the statistics the mean of total population is `mean = 75472` where the the `maximum value = 664046`. 
+
+```{r}
+Education %>% filter(Total == max(Total))
+```
+The population of manucipality of center of Athens is almost 10 times higher of the average population 
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Total), y=Education$Total)) +
+  geom_bar(stat="identity", color="black", fill="blue")+
+  coord_flip()+
+  geom_text(aes(label = Total), vjust = 0.2,hjust = 0, color = "black", size = 3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "Total Population",
+       x= "Municipality",
+       y="size")
+```
+
+ whole population is 
+```{r}
+totalPopulation <- sum(Education$Total)
+totalPopulation
+```
+Calculate the percent of the population of regions respect to the total population of the city.
+```{r}
+Education <- Education %>% mutate(Total_pct = Total/totalPopulation)
+```
+
+
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Total_pct), y=Total_pct)) +
+  geom_bar(stat="identity", color="black", fill="blue")+
+  coord_flip()+
+  geom_text(aes(label = sprintf("%.3f", Total_pct)), vjust = 0.2,hjust = 0, color = "black", size = 3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "Total Population",
+       subtitle = "In percentage",
+       x= "Municipality",
+       y="size")
+
+
+```
+
+
+The *Municipality of Athens, Regional Unit of Central Athens* has population almost 10 times larger than the average population.
+
+
+Therefore we will proceed in two decision :
+
+-  For the sake of coherence and meaningfulness in our analysis we are going to compare the *precentages of the education levels* of the people of the municipalities.
+This approach can help overcome the bias introduced by the significantly larger population in **Central region of Athens**. By looking at the percentage of individuals attending university, you can assess whether the education system is providing similar opportunities and outcomes across regions, regardless of population size.
+
+
+- In plotting, we are going to plot the logarithmic transform the sizes of the population.By applying a logarithmic transformation to the variable, the resultant plot exhibits enhanced visual appeal.
+
+
+We are going to merge the `geometry` column to the `Education` for the visualisation
+
+Merge the geometry to the `Education`
+
+```{r}
+
+
+
+geoEducation <- inner_join(Education, Athens_City, by = "Names_En")
+geoEducation <- st_as_sf(geoEducation)
+class(geoEducation)
+```
+
+
+
+
+
+```{r}
+# Create a new dataframe include only the populations
+Edu_Population <- Education %>% select(Names_En,education_levels)
+```
+
+```{r}
+# Change the format of the dataframe to long 
+Edu_Population <- Edu_Population %>%
+  gather(Level, Population,-Names_En)
+
+```
+
+
+
+```{r}
+# Factorize the Level
+Edu_Population$Level <- factor(Edu_Population$Level,
+                                   levels = education_levels)
+
+```
+
+```{r} 
+# Calculate the logarithm of the Population
+Edu_Population <- Edu_Population %>% mutate(logPopulation = log(Population))
+```
+
+- Boxplots
+
+Here its The Boxplots for the logarithm transformation of the Populations for each Education level
+```{r}
+ggplot(Edu_Population,aes(x= Level,y=logPopulation))+
+  geom_boxplot(fill = "lightblue") +
+    labs(title = "Boxplots Education Level Population",
+         subtitle = "Logarithm transformation")+
+  theme(axis.text.x = element_text(angle=7))
+```
+## Percentage
+
+
+```{r}
+# Create a new dataframe that contains only the Educational Level and  the  Regions 
+Education_Percent <- Education %>% select(Names_En,SerialNumber,contains("pct"),-Not_Ranked_pct,-Total_pct)
+```
+
+```{r}
+# Convert to a long format 
+Education_Percent <- Education_Percent %>%
+  gather(Level, Percent, -Names_En,-SerialNumber)
+```
+
+
+```{r}
+
+# Factorize Level according to education_levels
+Education_Percent <- Education_Percent%>% 
+  mutate(Level = recode(Level, "Uni_Degrees_pct" = education_levels[1], "Colleges_pct" = education_levels[2],
+                       "High_School_pct"=education_levels[3],"Middle_School_pct"=education_levels[4],
+                       "Primary_School_pct"=education_levels[5],"Quit_pct"= education_levels[6])) %>%
+  mutate(Level = factor(Level, levels = education_levels))
+  
+  
+```
+
+### General graph of Education
+
+
+We will create a dataframe to plot the total distribution of the Education Levels
+
+```{r}
+dfLevel <- Education %>% select(education_levels) %>% 
+  pivot_longer(cols = everything(), names_to = "Level", values_to = "Population") %>%
+  mutate(Level = factor(Level, levels = education_levels))
+
+
+
+ 
+
+Level_percentage <- dfLevel %>%
+  group_by(Level) %>%
+  summarize(Sum_Value = sum(Population)) %>% # Sum all the region's populations for each level
+  mutate(Percent = Sum_Value/totalPopulation) # devide them by the total Polulation to  calculate the precentage
+
+```
+
+
+```{r}
+ggplot(Level_percentage, aes( y = Percent, x = Level, fill = Level)) + 
+  geom_bar(position = "stack", stat = "identity") +
+  labs(title = "Education Level of the Regions",
+       subtitle = "In Total Population of the city",
+       xlab = "Education Level",
+       ylab = "Percent")+
+  geom_text(aes(label = sprintf("%.3f", Percent)), vjust = 0.2,hjust = -1, color = "black", size = 3)+
+  theme(axis.text.x = element_text(angle=10)) 
+```
+We see some tendency  that  for a majority of the people living in Athens their educational level is either finished the High School or the finished some University/Master/PhD degree. More percisely the highest proportion of the education level is to graduate from high school with `27,5%`  followed by  people with University degrees are `24,8%`.  Impression makes that the people with College degrees are only `6,5%` lower than people that Graduate from Primary and Middle School ``15,5%` and `11,5%` respectively
+
+```{r}
+# List to identify colors for the Levels
+edu_colors <- list("PhDs_Master_Universities"="yellow3",Colleges ="orange2","Graduate_High_School"="green",     "Graduate_Middle_School"= "cyan",  "Graduate_Primary_School"="red3","Quit_primary_school"="black")
+```
+
+```{r}
+ggplot(Education_Percent, aes(fill = Level, y = Percent, x = reorder(Names_En, -SerialNumber))) + 
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = edu_colors) +
+  coord_flip() +
+  labs(title = "Education Level of the Regions",
+       subtitle = "Proportion of each Level in the Population")
+```
+Here we can see the proportion that a level takes from the whole population of each region. The difference Regions like Marousi, Agia Paraskevi ,Papagos ,Penteli, Filothei- Psychiko is visualable. We agoing to analyse the different for each Level individual 
+
+
+#### Secodary Education
+
+Here we are going to visualize the data by split it to the population that finished secodary education. That means people that graduate from high school
+```{r}
+Education_Percent <- Education_Percent %>%
+  mutate(Finish_School = ifelse(Level %in% c("Graduate_Middle_School", "Graduate_Primary_School", "Quit_primary_school"), "no",
+                               ifelse(Level %in% c("Graduate_High_School", "Colleges", "PhDs_Master_Universities"), "yes", NA)))
+```
+
+```{r}
+Education_Percent_grouped <- Education_Percent %>%
+  group_by(Names_En, Finish_School) %>%
+  summarise(Sum_Percent = sum(Percent)) %>%
+  ungroup() 
+```
+
+
+```{r}
+ggplot(Education_Percent_grouped, aes(fill = Finish_School, y = Sum_Percent, x = reorder(Names_En, -if_else(Finish_School == "yes", Sum_Percent, -Sum_Percent)))) + 
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("yes" = "blue", "no" = "red")) +  
+  coord_flip() +
+  labs(title = "Education Level of the Regions",
+       subtitle = "Percentages of people that finished at least High School",
+       y = "Sum of Percentages") +
+  theme_minimal()
+```
+Ploting the map 
+
+```{r}
+geo_Edu_Perc <- Education_Percent_grouped %>%
+  filter(Finish_School == "yes") 
+geo_Edu_Perc <- left_join(Athens_City, geo_Edu_Perc, by = c("Names_En" = "Names_En"))
+```
+
+
+
+
+```{r}
+ggplot() + 
+  geom_sf(data = geo_Edu_Perc,aes(fill = Sum_Percent)) +
+  scale_fill_gradient(low = "red", high = "green", name = "Percentage") +
+  labs(title = "Finish at least High School",
+       subtitle = "(Percentage)")
+```
+It seems a tendency that the **East** part of the city tends to have more people that finished at at least the secondary education than the **West**.
+### PhD_Master_University degrees 
+
+
+
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Education$Uni_Degrees_pct), y=Education$Uni_Degrees_pct)) +
+  geom_bar(stat="identity", color="black", fill="yellow3")+
+  coord_flip()+
+  geom_text(aes(label = sprintf("%.3f", Uni_Degrees_pct)), vjust = 0.2,hjust = -1, color = "black", size = 3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "University Degrees",
+       subtitle = "In percentage",
+       x= "Municipality",
+       y="Percent")
+
+
+```
+We see that the Regions such as Filothei-Psychiko , Papagos-Cholargos and Vrilisia has the biggest proportion on the populations that have finished some University degree with `45%`,`42,5%`,`41,5%`
+```{r}
+ggplot(geoEducation) + 
+  geom_sf(aes(fill = geoEducation$Uni_Degrees_pct)) +
+  scale_fill_gradient(low = "red", high = "green",name = "percentage") +
+  labs(title = "University degrees",
+         subtitle = "(Percentage)")
+ 
+```
+
+From the map is visuable that the regions with highest proportions in Universities degrees located in the N-E of the city. From the other side, regions in the West have almost the half proportion in this category compare to the N-E.
+### College 
+
+
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Education$Colleges_pct), y=Education$Colleges_pct)) +
+  geom_bar(stat="identity", color="black", fill="orange2")+
+  coord_flip()+
+  geom_text(aes(label = sprintf("%.3f", Colleges_pct)), vjust = 0,hjust = 0, color = "black", size = 3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "College degrees",
+       subtitle = "In percentage",
+       x= "Municipality",
+       y="Percent")
+
+
+```
+
+Region that has the most people with college degrees (respect to their population) is N.Smyrni `8,9%` followed by Palaio Falyro and Glyfada `8,7%` and`8,95%` respectivly. Those regions located to the South of the City.
+
+```{r}
+ggplot(geoEducation) + 
+  geom_sf(aes(fill = geoEducation$Colleges_pct)) +
+  scale_fill_gradient(low = "red", high = "green",name = "percentage") +
+  labs(title = "College degree",
+         subtitle = "Percentage")
+ 
+```
+
+### Graduate High School
+
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Education$High_School_pct), y=Education$High_School_pct)) +
+  geom_bar(stat="identity", color="black", fill="green")+
+  coord_flip()+
+  geom_text(aes(label = sprintf("%.3f", Education$High_School_pct)), vjust = 0,hjust = 0, color = "black", size = 3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "Graduate High School degrees",
+       subtitle = "In percentage",
+       x= "Municipality",
+       y="Percent")
+
+
+```
+
+Here is a big proportion of the citizens that is from 20% to 32%. In this category the highest proportion belongs to Zografos 32,7% followed by Kalithea 32,2%  Vyronas 32,1%
+
+```{r}
+ggplot(geoEducation) + 
+  geom_sf(aes(fill = geoEducation$High_School_pct)) +
+  scale_fill_gradient(low = "red", high = "green",name = "percentage") +
+  labs(title = "Graduate from High School degree",
+         subtitle = "Percentage")
+ 
+```
+Except of the N-E part and the region Filothei-Psychiko this category is distibute more homogenweisly to the city.
+
+### Graduate from Middle School
+
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Education$Middle_School_pct), y=Education$Middle_School_pct)) +
+  geom_bar(stat="identity", color="black", fill="cyan")+
+  coord_flip()+
+  geom_text(aes(label = sprintf("%.3f", Education$Middle_School_pct)), vjust = 0,hjust = 0, color = "black", size = 3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "Graduate from Middle School ",
+       subtitle = "In percentage",
+       x= "Municipality",
+       y="Percent")
+
+
+```
+
+People that graduate from middle school are at the most in the west part of the city. More precisly, the highsest proportion belong to Agia Varvara with 16,2% followed Agioi Anargyroi- Kamatero 15,6% and Ilion 15,6%
+
+```{r}
+ggplot(geoEducation) + 
+  geom_sf(aes(fill = geoEducation$Middle_School_pct)) +
+  scale_fill_gradient(low = "red", high = "green",name = "percentage") +
+  labs(title = "Graduate from Middle School ",
+         subtitle = "Percentage")
+ 
+```
+Those regions are located in the West part of Athens
+### Graduate from Primary School
+
+
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Education$Primary_School_pct), y=Education$Primary_School_pct)) +
+  geom_bar(stat="identity", color="black", fill="red3")+
+  coord_flip()+
+  geom_text(aes(label = sprintf("%.3f", Primary_School_pct)), vjust = 0,hjust = 0, color = "black", size = 3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "Graduate from Primary School",
+       subtitle = "In percentage",
+       x= "Municipality",
+       y="Percent")
+
+
+```
+here we see again a big proportion to the regions Agia Varvara 26,4% Aigaleo 24% and Peristeri 23,4% . On cotrary ,regions such as  Psychiko - Filotheo has score 7,2%
+
+
+```{r}
+ggplot(geoEducation) + 
+  geom_sf(aes(fill = geoEducation$Primary_School_pct)) +
+  scale_fill_gradient(low = "red", high = "green",name = "percentage") +
+  labs(title = "Graduate from Primary School",
+         subtitle = "Percentage")
+ 
+```
+The regions located in the west 
+### Quit Primary School
+
+```{r}
+ggplot(data=Education, aes(reorder(Names_En, Education$Quit_pct), y=Education$Quit_pct)) +
+  geom_bar(stat="identity", color="white", fill="black")+
+  coord_flip()+
+  geom_text(aes(label = sprintf("%.3f", Education$Quit_pct)), vjust = 1,hjust = 0.2, color = "black", size = 3,angle= 0.3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "Graduate from Primary School",
+       subtitle = "In percentage",
+       x= "Municipality",
+       y="Percent")
+
+
+```
+Finally we have those that quit from primary school. The proportions here are very low (around 8%). Impression makes Agia Varvara that has double proportion from the average around 16%
+```{r}
+ggplot(geoEducation) + 
+  geom_sf(aes(fill = geoEducation$Quit_pct)) +
+  scale_fill_gradient(low = "red", high = "green",name = "percentage") +
+  labs(title = "Quit from Primary School",
+         subtitle = "Percentage")
+ 
+```
+
+
+
+
+# Sexharassment data
+
+Load the data of the sex harassment. It contains incident from all the Greece. Therefore we are going to edit the data only for the region of Athens.
+```{r}
+harassment <- read.csv("./Data/SexharassmentAthens.csv", header = TRUE, sep = ",")
+```
+
+
+```{r}
+harassment %>%  head(2)
+
+names(harassment)
+dim(harassment)
+```
+
+`X`: longitude
+`Y`: lattitude
+`Name`: Name of the street ,location of the incident
+`description`: Description for the crime 
+`Year`: year that the incident took place
+
+The data contains incidents from all over the country of Greece, we are going to restrict the data to the `Multipolygon` from `Athens_City`
+
+
+
+```{r}
+# Create a sf object from the dataframe harassment 
+harassment_points <- st_as_sf(harassment, coords = c("X", "Y"), crs = 4326)
+```
+
+```{r}
+# Find points that intersect with the geospatial multipolygon
+Athens_harassment <- st_intersection(harassment_points, Athens_City)
+```
+
+
+
+
+```{r}
+
+ggplot() +
+  geom_sf(data = Athens_City) +
+  geom_sf(data = Athens_harassment, color = "red", size = 1) +
+  labs(title = "Points Sexual Assualts") +
+  theme_minimal()
+```
+
+
+```{r}
+Assualt_Incidents <- Athens_harassment %>%group_by(Names_En) %>%
+  summarize(points_count = n()) %>% arrange(-points_count)
+```
+
+```{r}
+ggplot(data=Assualt_Incidents, aes(reorder(Names_En, Assualt_Incidents$points_count), y=Assualt_Incidents$points_count)) +
+  geom_bar(stat="identity", color="black", fill="red2")+
+  coord_flip()+
+  geom_text(aes(label = points_count), vjust = 0,hjust = 0, color = "black", size = 3,angle= 0.3)+
+  scale_y_continuous(labels = comma)+
+  labs(title = "Number of Attacks in every Region",
+       x= "Municipality",
+       y="Number")
+```
+We see that the most recorded incident for sexual assaults happened in the Central Region of Athens followed by Kalithea Peristeri and N. Smyrni
+
+We also observe that the size of `Assault_insident` dataframe is not equal with `Education` one.
+
+```{r}
+dim(Assualt_Incidents)
+```
+The is one municipality that have no incident of  attacks and that is :
+
+```{r}
+no_incident <- unique(Education$Names_En)[which(!unique(Education$Names_En) %in% unique(Assualt_Incidents$Names_En))]
+Education %>%filter(Names_En == no_incident) %>%  select(SerialNumber,Names_En)
+```
+adding to the `Assault_Incident` dataframe with `points_count` = 0
+
+```{r}
+metamorphosi <- Athens_City %>% filter(Names_En == no_incident) %>% select(Names_En,geometry)
+metamorphosi$points_count <-0 
+metamorphosi <- metamorphosi[,c("Names_En","points_count","geometry")]
+
+Assualt_Incidents <- rbind(Assualt_Incidents,metamorphosi)
+dim(Assualt_Incidents)
+
+```
+
+Finally, we see  the percentage of those incidents over the population of the municipality
+
+```{r}
+df <- Assualt_Incidents %>% select(Names_En,points_count) %>% as.data.frame()
+df <- df %>% select(-geometry)
+DF <- full_join(geoEducation,df, by = "Names_En")
+DF <- DF %>%  mutate(incident_pec = points_count/adjust_Total )
+View(DF)
+```
+
+
+
+
+```{r}
+ggplot(DF) + 
+  geom_sf(aes(fill = DF$incident_pec)) +
+  scale_fill_gradient(low = "green", high = "red",name = "percentage") +
+  labs(title = "Number of Attacks in the City")
+```
+
